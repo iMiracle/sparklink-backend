@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+<<<<<<< HEAD
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+=======
+
+	"sparklink-backend/config"
+	"sparklink-backend/service"
+
+	"github.com/gin-gonic/gin"
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 )
 
 func CORS() gin.HandlerFunc {
@@ -23,19 +31,36 @@ func CORS() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusOK)
 			return
 		}
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 		c.Next()
 	}
 }
 
+<<<<<<< HEAD
 func Auth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			response.Unauthorized(c, "authorization required")
+=======
+func Logger() gin.HandlerFunc {
+	return gin.Logger()
+}
+
+func Auth(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "authorization required"})
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 			c.Abort()
 			return
 		}
 
+<<<<<<< HEAD
 		tokenStr := authHeader
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			tokenStr = authHeader[7:]
@@ -53,6 +78,15 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		claims, ok := token.Claims.(*auth.Claims)
 		if !ok || !token.Valid {
 			response.Unauthorized(c, "invalid token")
+=======
+		token := authHeader[7:] // 去掉 "Bearer " 前缀
+
+		// 创建临时service来验证token
+		authService := service.NewAuthService(nil, cfg)
+		claims, err := authService.ValidateToken(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "invalid token"})
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 			c.Abort()
 			return
 		}
@@ -60,6 +94,7 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Next()
 	}
+<<<<<<< HEAD
 }
 
 func RateLimiter() gin.HandlerFunc {
@@ -106,3 +141,6 @@ func RateLimiter() gin.HandlerFunc {
 		c.Next()
 	}
 }
+=======
+}
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f

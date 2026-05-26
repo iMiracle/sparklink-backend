@@ -1,9 +1,16 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"time"
 	"sparklink-backend/pkg/response"
 	"sparklink-backend/service"
+=======
+	"net/http"
+
+	"sparklink-backend/service"
+
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +25,7 @@ func NewSubscriptionHandler(subService *service.SubscriptionService) *Subscripti
 func (h *SubscriptionHandler) ListPlans(c *gin.Context) {
 	plans, err := h.subService.GetPlans()
 	if err != nil {
+<<<<<<< HEAD
 		response.ServerError(c, "获取套餐列表失败")
 		return
 	}
@@ -37,6 +45,13 @@ func (h *SubscriptionHandler) ListPlans(c *gin.Context) {
 		result = []gin.H{}
 	}
 	response.Success(c, gin.H{"plans": result})
+=======
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "plans": plans})
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 }
 
 type CreateSubscriptionRequest struct {
@@ -46,6 +61,7 @@ type CreateSubscriptionRequest struct {
 
 func (h *SubscriptionHandler) Create(c *gin.Context) {
 	userID := c.GetUint("user_id")
+<<<<<<< HEAD
 	var req CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, response.ErrInvalidParams, "参数错误")
@@ -66,10 +82,34 @@ func (h *SubscriptionHandler) Create(c *gin.Context) {
 			"status":     sub.Status,
 		},
 	})
+=======
+
+	var req CreateSubscriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid request"})
+		return
+	}
+
+	sub, err := h.subService.CreateSubscription(userID, req.Plan, req.Amount)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "subscription": sub})
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 }
 
 func (h *SubscriptionHandler) Verify(c *gin.Context) {
 	userID := c.GetUint("user_id")
+<<<<<<< HEAD
 	valid, _ := h.subService.VerifySubscription(userID)
 	response.Success(c, gin.H{"valid": valid})
 }
+=======
+
+	valid, _ := h.subService.VerifySubscription(userID)
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "valid": valid})
+}
+>>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
