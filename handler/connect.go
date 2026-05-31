@@ -2,8 +2,10 @@ package handler
 
 import (
 	"time"
+
 	"sparklink-backend/pkg/response"
 	"sparklink-backend/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,17 +19,18 @@ func NewConnectHandler(connectService *service.ConnectService) *ConnectHandler {
 
 type StartConnectRequest struct {
 	NodeID   string `json:"nodeId" binding:"required"`
-	Protocol string `json:"protocol" binding:"required"`
+	Protocol string `json:"protocol"`
 }
 
 type StopConnectRequest struct {
-	SessionID string `json:"sessionId"`
+	SessionID string `json:"sessionId" binding:"required"`
 }
 
 type ReportConnectRequest struct {
 	SessionID string `json:"sessionId" binding:"required"`
 	Status    string `json:"status" binding:"required"`
 	Duration  int    `json:"duration"`
+	ErrorCode string `json:"errorCode"`
 }
 
 func (h *ConnectHandler) Start(c *gin.Context) {
@@ -37,24 +40,21 @@ func (h *ConnectHandler) Start(c *gin.Context) {
 		response.BadRequest(c, response.ErrInvalidParams, "参数错误")
 		return
 	}
-	session, node, err := h.connectService.Start(userID, req.NodeID, req.Protocol)
+	session, node, killSwitch, err := h.connectService.Start(userID, req.NodeID, req.Protocol)
 	if err != nil {
 		response.BadRequest(c, response.ErrInvalidParams, err.Error())
 		return
 	}
 	config := gin.H{
-		"host":      node.Host,
+		"server":    node.Host,
 		"port":      node.Port,
 		"publicKey": node.PublicKey,
-		"protocol":  node.Protocol,
-	}
-	if node.Protocols != "" {
-		config["protocols"] = parseTags(node.Protocols)
 	}
 	response.Success(c, gin.H{
-		"sessionId": session.SessionID,
-		"config":    config,
-		"expiresAt": time.Now().Add(1 * time.Hour).Format(time.RFC3339),
+		"sessionId":         session.SessionID,
+		"config":            config,
+		"expiresAt":         time.Now().Add(1 * time.Hour).Format(time.RFC3339),
+		"killSwitchEnabled": killSwitch,
 	})
 }
 
@@ -79,7 +79,7 @@ func (h *ConnectHandler) Report(c *gin.Context) {
 		response.BadRequest(c, response.ErrInvalidParams, "参数错误")
 		return
 	}
-	if err := h.connectService.Report(userID, req.SessionID, req.Status, req.Duration); err != nil {
+	if err := h.connectService.Report(userID, req.SessionID, req.Status, req.Duration, req.ErrorCode); err != nil {
 		response.BadRequest(c, response.ErrInvalidParams, err.Error())
 		return
 	}

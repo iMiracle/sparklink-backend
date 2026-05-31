@@ -1,17 +1,14 @@
 package handler
 
 import (
-<<<<<<< HEAD
 	"fmt"
+	"strings"
 	"time"
+
+	"sparklink-backend/middleware"
 	"sparklink-backend/pkg/response"
 	"sparklink-backend/service"
-=======
-	"net/http"
 
-	"sparklink-backend/service"
-
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,17 +22,13 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 
 type SendCodeRequest struct {
 	Phone string `json:"phone" binding:"required"`
+	Type  string `json:"type"`
 }
 
-<<<<<<< HEAD
 type VerifyCodeRequest struct {
 	Phone      string `json:"phone" binding:"required"`
 	Code       string `json:"code" binding:"required"`
 	InviteCode string `json:"inviteCode"`
-}
-
-func generateID() string {
-	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
 func (h *AuthHandler) SendCode(c *gin.Context) {
@@ -44,11 +37,15 @@ func (h *AuthHandler) SendCode(c *gin.Context) {
 		response.BadRequest(c, response.ErrInvalidParams, "手机号不能为空")
 		return
 	}
-	if err := h.authService.SendCode(req.Phone); err != nil {
+	expiresAt, err := h.authService.SendCode(req.Phone)
+	if err != nil {
 		response.ServerError(c, "验证码发送失败")
 		return
 	}
-	response.Success(c, gin.H{"message": "验证码已发送"})
+	response.Success(c, gin.H{
+		"message":   "验证码已发送",
+		"expiresAt": expiresAt.Format(time.RFC3339),
+	})
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -63,7 +60,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{
-		"userId":     user.ID,
+		"userId":     fmt.Sprintf("u_%d", user.ID),
 		"inviteCode": user.InviteCode,
 		"token":      token,
 		"expiresAt":  h.authService.GetTokenExpiry().Format(time.RFC3339),
@@ -84,58 +81,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response.Success(c, gin.H{
 		"token":     token,
 		"expiresAt": h.authService.GetTokenExpiry().Format(time.RFC3339),
-=======
-func (h *AuthHandler) SendCode(c *gin.Context) {
-	var req SendCodeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "phone required"})
-		return
-	}
-
-	// TODO: 发送验证码
-	// 这里需要接入短信服务
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "code sent"})
-}
-
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Phone   string `json:"phone"`
-	Password string `json:"password"`
-	DeviceID string `json:"device_id" binding:"required"`
-}
-
-func (h *AuthHandler) Login(c *gin.Context) {
-	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid request"})
-		return
-	}
-
-	user, token, err := h.authService.Login(req.Email, req.Phone, req.Password, req.DeviceID)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"token": token,
-		"user": gin.H{
-			"id":            user.ID,
-			"email":         user.Email,
-			"nickname":      user.Nickname,
-			"ad_credits":   user.AdCredits,
-			"expire_time":  user.ExpireTime,
-			"referral_code": user.ReferralCode,
-		},
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 	})
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	userID := c.GetUint("user_id")
-<<<<<<< HEAD
 	token, err := h.authService.GenerateToken(userID)
 	if err != nil {
 		response.ServerError(c, "令牌刷新失败")
@@ -145,19 +95,35 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	tokenStr := authHeader
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr = authHeader[7:]
+	}
+	if tokenStr != "" {
+		middleware.BlacklistToken(tokenStr)
+	}
 	response.Success(c, gin.H{"message": "已退出登录"})
 }
 
 func (h *AuthHandler) QrCode(c *gin.Context) {
-	id := generateID()
+	sessionID, err := h.authService.CreateQRSession()
+	if err != nil {
+		response.ServerError(c, "创建二维码失败")
+		return
+	}
 	response.Success(c, gin.H{
-		"sessionId": "qr_sess_" + id,
-		"qrData":    "sparklink://auth?session=qr_sess_" + id,
+		"sessionId": sessionID,
+		"qrData":    "sparklink://auth?session=" + sessionID,
 	})
 }
 
 func (h *AuthHandler) QrCodeStatus(c *gin.Context) {
-	sessionID := c.Param("sessionId")
+	sessionID := c.Query("sessionId")
+	if sessionID == "" {
+		response.BadRequest(c, response.ErrInvalidParams, "请提供 sessionId")
+		return
+	}
 	status, token, expiresAt := h.authService.GetQRStatus(sessionID)
 	response.Success(c, gin.H{
 		"status":    status,
@@ -165,18 +131,44 @@ func (h *AuthHandler) QrCodeStatus(c *gin.Context) {
 		"expiresAt": expiresAt,
 	})
 }
-=======
 
-	token, err := h.authService.GenerateToken(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "failed to generate token"})
+func (h *AuthHandler) QrScan(c *gin.Context) {
+	var req struct {
+		SessionID string `json:"sessionId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, "请提供 sessionId")
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "token": token})
+	if err := h.authService.ScanQR(req.SessionID); err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"message": "扫码成功"})
 }
 
-func (h *AuthHandler) Logout(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "logged out"})
+func (h *AuthHandler) QrConfirm(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var req struct {
+		SessionID string `json:"sessionId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, "请提供 sessionId")
+		return
+	}
+	token, err := h.authService.ConfirmQR(userID, req.SessionID)
+	if err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"token": token})
 }
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
+
+func (h *AuthHandler) AcceptTerms(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	if err := h.authService.AcceptTerms(userID); err != nil {
+		response.NotFound(c, "用户不存在")
+		return
+	}
+	response.Success(c, gin.H{"message": "已同意服务条款"})
+}

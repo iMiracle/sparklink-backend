@@ -11,19 +11,36 @@ import (
 type ConnectService struct {
 	connRepo repository.ConnectRepository
 	nodeRepo repository.NodeRepository
+	userRepo repository.UserRepository
 }
 
-func NewConnectService(connRepo repository.ConnectRepository, nodeRepo repository.NodeRepository) *ConnectService {
+func NewConnectService(connRepo repository.ConnectRepository, nodeRepo repository.NodeRepository, userRepo repository.UserRepository) *ConnectService {
 	return &ConnectService{
 		connRepo: connRepo,
 		nodeRepo: nodeRepo,
+		userRepo: userRepo,
 	}
 }
 
-func (s *ConnectService) Start(userID uint, nodeID, protocol string) (*model.ConnectSession, *model.Node, error) {
+func (s *ConnectService) Start(userID uint, nodeID, protocol string) (*model.ConnectSession, *model.Node, bool, error) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, nil, false, errors.New("用户不存在")
+	}
+
 	node, err := s.nodeRepo.FindByNodeID(nodeID)
 	if err != nil {
-		return nil, nil, errors.New("节点不存在")
+		return nil, nil, false, errors.New("节点不存在")
+	}
+
+	if node.VisibilityLevel == "vip" {
+		if user.VipStatus != "active" || user.VipExpireAt == nil || user.VipExpireAt.Before(time.Now()) {
+			return nil, nil, false, errors.New("需要 VIP 订阅才能连接此节点")
+		}
+	}
+
+	if user.BalanceMinutes <= 0 && user.VipStatus != "active" {
+		return nil, nil, false, errors.New("余额不足")
 	}
 
 	existing, _ := s.connRepo.FindActiveSession(userID)
@@ -43,10 +60,10 @@ func (s *ConnectService) Start(userID uint, nodeID, protocol string) (*model.Con
 		StartedAt: time.Now(),
 	}
 	if err := s.connRepo.CreateSession(session); err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
-	return session, node, nil
+	return session, node, user.KillSwitchEnabled, nil
 }
 
 func (s *ConnectService) Stop(userID uint, sessionID string) error {
@@ -63,7 +80,10 @@ func (s *ConnectService) Stop(userID uint, sessionID string) error {
 	return s.connRepo.UpdateSession(session)
 }
 
-func (s *ConnectService) Report(userID uint, sessionID, status string, duration int) error {
+func (s *ConnectService) Report(userID uint, sessionID, status string, duration int, errorCode string) error {
+	if duration > 0 {
+		s.userRepo.AddBalance(userID, -duration)
+	}
 	session, err := s.connRepo.FindActiveSession(userID)
 	if err != nil {
 		return errors.New("无活跃连接")

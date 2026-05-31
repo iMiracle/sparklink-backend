@@ -21,6 +21,9 @@ type Repos struct {
 	Subscription repository.SubscriptionRepository
 	Connect      repository.ConnectRepository
 	Verification repository.VerificationRepository
+	Admin        repository.AdminRepository
+	Announcement repository.AnnouncementRepository
+	AuditLog     repository.AuditLogRepository
 }
 
 func NewServices(repos *Repos, cfg *config.Config) *Services {
@@ -29,7 +32,7 @@ func NewServices(repos *Repos, cfg *config.Config) *Services {
 		Node:         NewNodeService(repos.Node),
 		Reward:       NewRewardService(repos.Reward, repos.User),
 		Subscription: NewSubscriptionService(repos.Subscription),
-		Connect:      NewConnectService(repos.Connect, repos.Node),
+		Connect:      NewConnectService(repos.Connect, repos.Node, repos.User),
 		User:         NewUserService(repos.User),
 	}
 }

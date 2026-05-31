@@ -15,7 +15,6 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /app/sparklink-api .
-COPY --from=builder /app/.env.example ./
 
 EXPOSE 8080
 

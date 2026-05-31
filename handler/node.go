@@ -1,18 +1,11 @@
 package handler
 
 import (
-<<<<<<< HEAD
 	"strings"
 
 	"sparklink-backend/pkg/response"
 	"sparklink-backend/service"
-=======
-	"net/http"
-	"strconv"
 
-	"sparklink-backend/service"
-
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,9 +17,18 @@ func NewNodeHandler(nodeService *service.NodeService) *NodeHandler {
 	return &NodeHandler{nodeService: nodeService}
 }
 
-<<<<<<< HEAD
-type SpeedtestRequest struct {
-	NodeID string `json:"nodeId" binding:"required"`
+func (h *NodeHandler) Speedtest(c *gin.Context) {
+	nodeID := c.Param("nodeId")
+	download, upload, latency, err := h.nodeService.Speedtest(nodeID)
+	if err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, "节点不存在")
+		return
+	}
+	response.Success(c, gin.H{
+		"downloadSpeed": download,
+		"uploadSpeed":   upload,
+		"latency":       latency,
+	})
 }
 
 func (h *NodeHandler) List(c *gin.Context) {
@@ -61,28 +63,10 @@ func (h *NodeHandler) List(c *gin.Context) {
 	response.Success(c, gin.H{
 		"nodes": result,
 		"total": len(result),
-=======
-func (h *NodeHandler) List(c *gin.Context) {
-	protocol := c.Query("protocol")
-	nodeType := c.Query("type")
-	country := c.Query("region")
-
-	nodes, err := h.nodeService.GetNodes(protocol, nodeType, country)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"nodes": nodes,
-		"total": len(nodes),
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
 	})
 }
 
 func (h *NodeHandler) Get(c *gin.Context) {
-<<<<<<< HEAD
 	nodeID := c.Param("nodeId")
 	node, err := h.nodeService.GetNode(nodeID)
 	if err != nil {
@@ -113,24 +97,6 @@ func (h *NodeHandler) Get(c *gin.Context) {
 	})
 }
 
-func (h *NodeHandler) Speedtest(c *gin.Context) {
-	var req SpeedtestRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, response.ErrInvalidParams, "参数错误")
-		return
-	}
-	download, upload, latency, err := h.nodeService.Speedtest(req.NodeID)
-	if err != nil {
-		response.BadRequest(c, response.ErrInvalidParams, "节点不存在")
-		return
-	}
-	response.Success(c, gin.H{
-		"downloadSpeed": download,
-		"uploadSpeed":   upload,
-		"latency":       latency,
-	})
-}
-
 func (h *NodeHandler) UpdatePing(c *gin.Context) {
 	var req struct {
 		NodeID  string `json:"nodeId" binding:"required"`
@@ -147,59 +113,67 @@ func (h *NodeHandler) UpdatePing(c *gin.Context) {
 	response.Success(c, gin.H{"message": "ping updated"})
 }
 
+func (h *NodeHandler) Favorites(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	favs, err := h.nodeService.GetFavorites(userID)
+	if err != nil {
+		response.ServerError(c, "获取收藏列表失败")
+		return
+	}
+	var result []gin.H
+	for _, f := range favs {
+		result = append(result, gin.H{
+			"nodeId":   f.NodeID,
+			"favoriteId": f.ID,
+		})
+	}
+	if result == nil {
+		result = []gin.H{}
+	}
+	response.Success(c, gin.H{"favorites": result})
+}
+
+func (h *NodeHandler) Regions(c *gin.Context) {
+	regions, err := h.nodeService.GetRegions()
+	if err != nil {
+		response.ServerError(c, "获取地区列表失败")
+		return
+	}
+	if regions == nil {
+		regions = []string{}
+	}
+	response.Success(c, gin.H{"regions": regions})
+}
+
+func (h *NodeHandler) AddFavorite(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var req struct {
+		NodeID string `json:"nodeId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, response.ErrInvalidParams, "参数错误")
+		return
+	}
+	if err := h.nodeService.AddFavorite(userID, req.NodeID); err != nil {
+		response.ServerError(c, "收藏失败")
+		return
+	}
+	response.Success(c, gin.H{"message": "已收藏"})
+}
+
+func (h *NodeHandler) RemoveFavorite(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	nodeID := c.Param("nodeId")
+	if err := h.nodeService.RemoveFavorite(userID, nodeID); err != nil {
+		response.ServerError(c, "取消收藏失败")
+		return
+	}
+	response.Success(c, gin.H{"message": "已取消收藏"})
+}
+
 func parseTags(tagsStr string) []string {
 	if tagsStr == "" {
 		return []string{}
 	}
 	return strings.Split(tagsStr, ",")
 }
-=======
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid id"})
-		return
-	}
-
-	node, err := h.nodeService.GetNode(uint(id))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "node not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "node": node})
-}
-
-type PingRequest struct {
-	NodeID  uint `json:"node_id" binding:"required"`
-	Latency int  `json:"latency" binding:"required"`
-}
-
-func (h *NodeHandler) UpdatePing(c *gin.Context) {
-	var req PingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid request"})
-		return
-	}
-
-	h.nodeService.UpdatePing(req.NodeID, req.Latency)
-
-	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-func (h *NodeHandler) Favorites(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "nodes": []}})
-}
-
-type FavoriteRequest struct {
-	NodeID uint `json:"node_id" binding:"required"`
-}
-
-func (h *NodeHandler) AddFavorite(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-func (h *NodeHandler) RemoveFavorite(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true})
-}
->>>>>>> 4444d9abefbcf39a2473e97f16b5ac708632885f
